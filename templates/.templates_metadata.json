@@ -1,0 +1,531 @@
+{
+  "78e4b92d-20c2-4ec9-b9d4-785f4ad0840d": {
+    "template_id": "78e4b92d-20c2-4ec9-b9d4-785f4ad0840d",
+    "name": "Test Template",
+    "file_path": "templates\\78e4b92d-20c2-4ec9-b9d4-785f4ad0840d.xlsx",
+    "placeholders": [
+      "active_members",
+      "budget",
+      "completion_rate",
+      "end_date",
+      "generated_date",
+      "on_leave_members",
+      "project_manager",
+      "project_name",
+      "project_status",
+      "start_date",
+      "table_data",
+      "total_team_size"
+    ],
+    "table_mappings": {
+      "project_manager": [
+        {
+          "column": "Project",
+          "key": "project"
+        },
+        {
+          "column": "{{project_name}}",
+          "key": "__project_name__"
+        },
+        {
+          "column": "Total Team Size",
+          "key": "total_team_size"
+        },
+        {
+          "column": "{{total_team_size}}",
+          "key": "__total_team_size__"
+        }
+      ],
+      "active_members": [
+        {
+          "column": "Project",
+          "key": "project"
+        },
+        {
+          "column": "{{project_name}}",
+          "key": "__project_name__"
+        },
+        {
+          "column": "Total Team Size",
+          "key": "total_team_size"
+        },
+        {
+          "column": "{{total_team_size}}",
+          "key": "__total_team_size__"
+        }
+      ],
+      "project_status": [
+        {
+          "column": "Manager",
+          "key": "manager"
+        },
+        {
+          "column": "{{project_manager}}",
+          "key": "__project_manager__"
+        },
+        {
+          "column": "Active Members",
+          "key": "active_members"
+        },
+        {
+          "column": "{{active_members}}",
+          "key": "__active_members__"
+        }
+      ],
+      "on_leave_members": [
+        {
+          "column": "Manager",
+          "key": "manager"
+        },
+        {
+          "column": "{{project_manager}}",
+          "key": "__project_manager__"
+        },
+        {
+          "column": "Active Members",
+          "key": "active_members"
+        },
+        {
+          "column": "{{active_members}}",
+          "key": "__active_members__"
+        }
+      ],
+      "start_date": [
+        {
+          "column": "Status",
+          "key": "status"
+        },
+        {
+          "column": "{{project_status}}",
+          "key": "__project_status__"
+        },
+        {
+          "column": "On Leave",
+          "key": "on_leave"
+        },
+        {
+          "column": "{{on_leave_members}}",
+          "key": "__on_leave_members__"
+        }
+      ],
+      "completion_rate": [
+        {
+          "column": "Status",
+          "key": "status"
+        },
+        {
+          "column": "{{project_status}}",
+          "key": "__project_status__"
+        },
+        {
+          "column": "On Leave",
+          "key": "on_leave"
+        },
+        {
+          "column": "{{on_leave_members}}",
+          "key": "__on_leave_members__"
+        }
+      ],
+      "end_date": [
+        {
+          "column": "Start Date",
+          "key": "start_date"
+        },
+        {
+          "column": "{{start_date}}",
+          "key": "__start_date__"
+        },
+        {
+          "column": "Completion Rate",
+          "key": "completion_rate"
+        },
+        {
+          "column": "{{completion_rate}}%",
+          "key": "__completion_rate___"
+        }
+      ],
+      "budget": [
+        {
+          "column": "End Date",
+          "key": "end_date"
+        },
+        {
+          "column": "{{end_date}}",
+          "key": "__end_date__"
+        }
+      ],
+      "generated_date": [
+        {
+          "column": "End Date",
+          "key": "end_date"
+        },
+        {
+          "column": "{{end_date}}",
+          "key": "__end_date__"
+        }
+      ],
+      "table_data": [
+        {
+          "column": "Name",
+          "key": "name"
+        },
+        {
+          "column": "Role",
+          "key": "role"
+        },
+        {
+          "column": "Department",
+          "key": "department"
+        },
+        {
+          "column": "Status",
+          "key": "status"
+        }
+      ]
+    },
+    "created_at": "2026-01-15T11:27:10.864197",
+    "description": "Testing the Generation from Template"
+  },
+  "771cff1c-24a9-46e2-9994-d3a193f3ec07": {
+    "template_id": "771cff1c-24a9-46e2-9994-d3a193f3ec07",
+    "name": "TestTemplate",
+    "file_path": "templates\\771cff1c-24a9-46e2-9994-d3a193f3ec07.xlsx",
+    "placeholders": [
+      "project_status",
+      "table_data",
+      "project_manager",
+      "start_date",
+      "end_date",
+      "completion_rate",
+      "generated_date",
+      "total_team_size",
+      "active_members",
+      "project_name",
+      "budget",
+      "on_leave_members"
+    ],
+    "table_mappings": {
+      "project_manager": [
+        {
+          "column": "Project",
+          "key": "project"
+        },
+        {
+          "column": "{{project_name}}",
+          "key": "__project_name__"
+        },
+        {
+          "column": "Total Team Size",
+          "key": "total_team_size"
+        },
+        {
+          "column": "{{total_team_size}}",
+          "key": "__total_team_size__"
+        }
+      ],
+      "active_members": [
+        {
+          "column": "Project",
+          "key": "project"
+        },
+        {
+          "column": "{{project_name}}",
+          "key": "__project_name__"
+        },
+        {
+          "column": "Total Team Size",
+          "key": "total_team_size"
+        },
+        {
+          "column": "{{total_team_size}}",
+          "key": "__total_team_size__"
+        }
+      ],
+      "project_status": [
+        {
+          "column": "Manager",
+          "key": "manager"
+        },
+        {
+          "column": "{{project_manager}}",
+          "key": "__project_manager__"
+        },
+        {
+          "column": "Active Members",
+          "key": "active_members"
+        },
+        {
+          "column": "{{active_members}}",
+          "key": "__active_members__"
+        }
+      ],
+      "on_leave_members": [
+        {
+          "column": "Manager",
+          "key": "manager"
+        },
+        {
+          "column": "{{project_manager}}",
+          "key": "__project_manager__"
+        },
+        {
+          "column": "Active Members",
+          "key": "active_members"
+        },
+        {
+          "column": "{{active_members}}",
+          "key": "__active_members__"
+        }
+      ],
+      "start_date": [
+        {
+          "column": "Status",
+          "key": "status"
+        },
+        {
+          "column": "{{project_status}}",
+          "key": "__project_status__"
+        },
+        {
+          "column": "On Leave",
+          "key": "on_leave"
+        },
+        {
+          "column": "{{on_leave_members}}",
+          "key": "__on_leave_members__"
+        }
+      ],
+      "completion_rate": [
+        {
+          "column": "Status",
+          "key": "status"
+        },
+        {
+          "column": "{{project_status}}",
+          "key": "__project_status__"
+        },
+        {
+          "column": "On Leave",
+          "key": "on_leave"
+        },
+        {
+          "column": "{{on_leave_members}}",
+          "key": "__on_leave_members__"
+        }
+      ],
+      "end_date": [
+        {
+          "column": "Start Date",
+          "key": "start_date"
+        },
+        {
+          "column": "{{start_date}}",
+          "key": "__start_date__"
+        },
+        {
+          "column": "Completion Rate",
+          "key": "completion_rate"
+        },
+        {
+          "column": "{{completion_rate}}%",
+          "key": "__completion_rate___"
+        }
+      ],
+      "budget": [
+        {
+          "column": "End Date",
+          "key": "end_date"
+        },
+        {
+          "column": "{{end_date}}",
+          "key": "__end_date__"
+        }
+      ],
+      "generated_date": [
+        {
+          "column": "End Date",
+          "key": "end_date"
+        },
+        {
+          "column": "{{end_date}}",
+          "key": "__end_date__"
+        }
+      ],
+      "table_data": [
+        {
+          "column": "Name",
+          "key": "name"
+        },
+        {
+          "column": "Role",
+          "key": "role"
+        },
+        {
+          "column": "Department",
+          "key": "department"
+        },
+        {
+          "column": "Status",
+          "key": "status"
+        }
+      ]
+    },
+    "created_at": "2026-01-15T11:46:45.614837",
+    "description": "Test usage for generation with placeholders"
+  },
+  "0a3b0a2f-3c6d-41a4-b28c-3a7fae29b3e8": {
+    "template_id": "0a3b0a2f-3c6d-41a4-b28c-3a7fae29b3e8",
+    "name": "Test_Excel",
+    "file_path": "templates\\0a3b0a2f-3c6d-41a4-b28c-3a7fae29b3e8.xlsx",
+    "placeholders": [
+      "active_members",
+      "budget",
+      "completion_rate",
+      "end_date",
+      "generated_date",
+      "on_leave_members",
+      "project_manager",
+      "project_name",
+      "project_status",
+      "start_date",
+      "table_data",
+      "total_team_size"
+    ],
+    "table_mappings": {
+      "project_manager": [
+        {
+          "column": "{{project_name}}",
+          "key": "__project_name__"
+        },
+        {
+          "column": "Total Team Size",
+          "key": "total_team_size"
+        },
+        {
+          "column": "{{total_team_size}}",
+          "key": "__total_team_size__"
+        }
+      ],
+      "active_members": [
+        {
+          "column": "{{total_team_size}}",
+          "key": "__total_team_size__"
+        }
+      ],
+      "project_status": [
+        {
+          "column": "{{project_manager}}",
+          "key": "__project_manager__"
+        },
+        {
+          "column": "Active Members",
+          "key": "active_members"
+        },
+        {
+          "column": "{{active_members}}",
+          "key": "__active_members__"
+        }
+      ],
+      "on_leave_members": [
+        {
+          "column": "{{active_members}}",
+          "key": "__active_members__"
+        }
+      ],
+      "start_date": [
+        {
+          "column": "{{project_status}}",
+          "key": "__project_status__"
+        },
+        {
+          "column": "On Leave",
+          "key": "on_leave"
+        },
+        {
+          "column": "{{on_leave_members}}",
+          "key": "__on_leave_members__"
+        }
+      ],
+      "end_date": [
+        {
+          "column": "{{start_date}}",
+          "key": "__start_date__"
+        },
+        {
+          "column": "Completion Rate",
+          "key": "completion_rate"
+        },
+        {
+          "column": "{{completion_rate}}%",
+          "key": "__completion_rate___"
+        }
+      ],
+      "budget": [
+        {
+          "column": "{{end_date}}",
+          "key": "__end_date__"
+        }
+      ],
+      "table_data": [
+        {
+          "column": "Name",
+          "key": "name"
+        },
+        {
+          "column": "Role",
+          "key": "role"
+        },
+        {
+          "column": "Department",
+          "key": "department"
+        },
+        {
+          "column": "Status",
+          "key": "status"
+        }
+      ]
+    },
+    "created_at": "2026-01-15T11:55:12.248391",
+    "description": "Testing implementation"
+  },
+  "53adf645-4fed-46c8-9243-3c7b167f7d6c": {
+    "template_id": "53adf645-4fed-46c8-9243-3c7b167f7d6c",
+    "name": "Testing Doc",
+    "file_path": "templates\\53adf645-4fed-46c8-9243-3c7b167f7d6c.xlsx",
+    "placeholders": [
+      "active_members",
+      "budget",
+      "completion_rate",
+      "end_date",
+      "generated_date",
+      "on_leave_members",
+      "project_manager",
+      "project_name",
+      "project_status",
+      "start_date",
+      "total_team_size"
+    ],
+    "table_mappings": {
+      "table_data": [
+        {
+          "column": "Name",
+          "key": "name"
+        },
+        {
+          "column": "Role",
+          "key": "role"
+        },
+        {
+          "column": "Department",
+          "key": "department"
+        },
+        {
+          "column": "Status",
+          "key": "status"
+        }
+      ]
+    },
+    "created_at": "2026-01-15T13:35:34.235450",
+    "description": "Testing 15/01"
+  }
+}

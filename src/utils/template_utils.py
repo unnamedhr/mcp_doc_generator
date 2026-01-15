@@ -6,8 +6,6 @@ import base64
 import tempfile
 from docxtpl import DocxTemplate
 
-from components.templates.template_manager import TemplateManager
-
 
 def extract_jinja_placeholders_from_text(text: str) -> List[str]:
     pattern = r'\{\{\s*([a-zA-Z_][a-zA-Z0-9_.]*)\s*\}\}'
@@ -26,24 +24,13 @@ def generate_default_mapping(placeholders: List[str]) -> List[Dict[str, Any]]:
 
 def create_temp_template_from_base64(base64_content: str) -> Path:
     binary_data = base64.b64decode(base64_content)
-    temp_file = tempfile.NamedTemporaryFile(suffix=".docx", delete=False)
+
+    suffix = ".xlsx" if len(binary_data) > 5000 else ".docx"
+
+    temp_file = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
     temp_file.write(binary_data)
     temp_file.close()
     return Path(temp_file.name)
-
-
-def cleanup_old_templates(template_manager: TemplateManager, max_age_days: int = 7) -> int:
-    old_template_ids = template_manager.get_old_templates(max_age_days)
-    deleted = 0
-
-    for template_id in old_template_ids:
-        if template_manager.delete_template(template_id):
-            deleted += 1
-
-    if deleted > 0:
-        print(f"🧹 Cleaned up {deleted} old templates")
-
-    return deleted
 
 
 def safe_render_template(
@@ -51,20 +38,20 @@ def safe_render_template(
         context: Dict[str, Any],
         error_handler: Optional[Callable[[str, str], Any]] = None
 ) -> Dict[str, Any]:
-    missing_vars = set()
+    if template_path.suffix.lower() != ".docx":
+        print(f"Skipping DOCX validation for {template_path.suffix}")
+        return context
 
+    missing_vars = set()
     try:
         tpl = DocxTemplate(str(template_path))
         undeclared = tpl.get_undeclared_template_variables()
-
         for var in undeclared:
             missing_vars.add(var)
             if error_handler:
                 error_handler(var, f"Missing in context")
-
         context.update({var: "" for var in missing_vars})
         return context
-
     except Exception as e:
         print(f"Template validation failed: {e}")
         return context
@@ -76,21 +63,17 @@ def generate_preview_mapping(
         max_suggestions: int = 10
 ) -> List[Dict[str, Any]]:
     suggestions = []
-
     for ph in placeholders:
         if ph in data_sample:
             suggestions.append({"placeholder": ph, "path": ph})
             continue
-
         for key in data_sample.keys():
             if ph.startswith(key.lower()):
                 suggestions.append({
                     "placeholder": ph,
                     "path": f"{key}.{ph[len(key):]}"
                 })
-
         suggestions.append({"placeholder": ph, "path": ph})
-
     return suggestions[:max_suggestions]
 
 

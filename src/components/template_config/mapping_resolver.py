@@ -31,6 +31,17 @@ class MappingResolver:
         MappingResolver.TRANSFORMS[name] = func
 
     @staticmethod
+    def is_table_placeholder(placeholder: str) -> bool:
+        return placeholder.startswith("{{/") and placeholder.endswith("}}")
+
+    @staticmethod
+    def extract_table_path(placeholder: str) -> Optional[str]:
+        if not MappingResolver.is_table_placeholder(placeholder):
+            return None
+        path = placeholder[3:-2].strip()
+        return path if path else None
+
+    @staticmethod
     def resolve_path(data: Dict[str, Any], path: str) -> Any:
         """
         Resolve JSONPath expression in data dict.
