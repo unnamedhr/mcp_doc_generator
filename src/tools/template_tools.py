@@ -117,7 +117,8 @@ class TemplateTools:
     def __init__(self, template_generator: TemplateDocumentGenerator):
         self.tg = template_generator
 
-    def generate_from_base64_template(self, req: GenerateFromBase64TemplateReq) -> GenerateFromBase64TemplateOutput:
+    def generate_from_template(self, req: GenerateFromBase64TemplateReq) -> GenerateFromBase64TemplateOutput:
+        """ Generate Report from Template."""
         template_path = create_temp_template_from_base64(req.base64_template)
         try:
             raw_placeholders, detected_table_mappings = extract_template_structure(template_path)

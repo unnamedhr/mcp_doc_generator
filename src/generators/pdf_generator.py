@@ -1,244 +1,326 @@
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from typing import Union, Literal, Dict, Any, List
+from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT, TA_JUSTIFY
 from reportlab.lib.units import inch
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter, A4, legal, landscape
+from reportlab.platypus import (
+    SimpleDocTemplate,
+    Table,
+    TableStyle,
+    Paragraph,
+    Spacer,
+    Image,
+)
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from datetime import datetime
 import json
 from pathlib import Path
-from typing import Dict, Any, List, Optional
 
+# Output directory
 OUTPUT_DIR = Path("./generated_documents")
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+AlignmentValue = Union[int, str, None]
+ImageAlignOutput = Literal["LEFT", "CENTER", "CENTRE", "RIGHT"]
 
 
 def parse_components_config(components_json: str) -> Dict[str, Dict[str, Any]]:
-
     defaults = {
-        "header": {"enabled": True, "text": "Professional Report", "font_size": 14, "color": "#1F3A93"},
-        "footer": {"enabled": True, "text": "Confidential | {timestamp}", "font_size": 9, "color": "#666666"},
-        "table_style": {"header_bg": "#2C5282", "header_text": "#FFFFFF", "row_colors": ["#FFFFFF", "#F7FAFC"]},
-        "signature": {"enabled": False, "name": "John Doe", "title": "Director"}
+        "header": {
+            "enabled": True,
+            "text": "Professional Report",
+            "font_size": 14,
+            "color": "#1F3A93",
+            "alignment": TA_CENTER,
+        },
+        "footer": {
+            "enabled": True,
+            "text": "Confidential | {timestamp}",
+            "font_size": 9,
+            "color": "#666666",
+            "alignment": TA_CENTER,
+        },
+        "table_style": {
+            "header_bg": "#2C5282",
+            "header_text": "#FFFFFF",
+            "row_colors": ["#FFFFFF", "#F7FAFC"],
+            "border_color": "#CCCCCC",
+        },
+        "signature": {
+            "enabled": False,
+            "font_size": 10,
+            "alignment": TA_RIGHT,
+        },
     }
 
     if not components_json or components_json.strip() == "{}":
         return defaults
 
     try:
-        config_dict = json.loads(components_json)
+        user_cfg = json.loads(components_json)
         merged = {}
-        for key in defaults:
-            merged[key] = {**defaults[key], **config_dict.get(key, {})}
+        for key, base in defaults.items():
+            merged[key] = {**base, **user_cfg.get(key, {})}
         return merged
     except json.JSONDecodeError:
         return defaults
 
 
-def _apply_component_header(components: Dict[str, Dict[str, Any]], config: Dict[str, Any],
-                            styles, elements: List) -> None:
-    comp_header = components.get('header', {})
-    if not comp_header.get('enabled', True):
-        return
+def _register_fonts(font_cfg: Dict[str, Any]) -> Dict[str, str]:
+    registered: Dict[str, str] = {}
+    for role, spec in font_cfg.items():
+        name = spec.get("name")
+        path = spec.get("ttf_path")
+        if not name or not path:
+            continue
+        try:
+            pdfmetrics.registerFont(TTFont(name, path))
+            registered[role] = name
+        except Exception:
+            pass
+    return registered
 
-    header_style = ParagraphStyle(
-        'ComponentHeader',
-        parent=styles['Heading1'],
-        fontSize=comp_header.get('font_size', 14),
-        textColor=colors.HexColor(comp_header.get('color', '#1F3A93')),
-        spaceAfter=comp_header.get('space_after', 6),
-        alignment=comp_header.get('alignment', 1)
-    )
-    elements.append(Paragraph(comp_header['text'], header_style))
+
+def _resolve_alignment(raw: AlignmentValue) -> int:
+    if raw is None:
+        return TA_LEFT
+    if isinstance(raw, int):
+        return raw
+    if isinstance(raw, str):
+        s = raw.lower().strip()
+        return {
+            "left": TA_LEFT,
+            "center": TA_CENTER,
+            "centre": TA_CENTER,
+            "right": TA_RIGHT,
+            "justify": TA_JUSTIFY,
+        }.get(s, TA_LEFT)
+    return TA_LEFT
+
+
+def _parse_color(value: Any, profile: str = "RGB", default="#000000"):
+    if not value:
+        value = default
+
+    if isinstance(value, dict) and profile.upper() == "CMYK":
+        return colors.CMYKColor(
+            float(value.get("c", 0)) * 100,
+            float(value.get("m", 0)) * 100,
+            float(value.get("y", 0)) * 100,
+            float(value.get("k", 0)) * 100,
+        )
+
+    if isinstance(value, str):
+        if value.startswith("#"):
+            return colors.HexColor(value)
+        if value.lower().startswith("rgb("):
+            r, g, b = [int(x.strip()) for x in value[4:-1].split(",")]
+            return colors.Color(r / 255, g / 255, b / 255)
+
+    return colors.HexColor(default)
+
+
+def _get_page_size(doc_cfg: Dict[str, Any]):
+    base = {
+        "LETTER": letter,
+        "A4": A4,
+        "LEGAL": legal,
+    }.get(str(doc_cfg.get("page_size", "LETTER")).upper(), letter)
+
+    if doc_cfg.get("orientation", "portrait").lower() == "landscape":
+        return landscape(base)
+    return base
+
+
+def _resolve_image_align(raw: AlignmentValue) -> ImageAlignOutput:
+    if isinstance(raw, str):
+        return raw.upper()
+    if isinstance(raw, int):
+        return {0: "LEFT", 1: "CENTER", 2: "RIGHT"}.get(raw, "LEFT")
+    return "LEFT"
+
+
+# Components
+def _render_logo(path: str, elements: List[Any], width_in: float, align):
+    p = Path(path)
+    if not p.exists():
+        return
+    img = Image(str(p), width=width_in * inch)
+    img.hAlign = _resolve_image_align(align)
+    elements.append(img)
     elements.append(Spacer(1, 0.15 * inch))
 
 
-def _apply_component_footer(components: Dict[str, Dict[str, Any]], styles, elements: List) -> None:
-    comp_footer = components.get('footer', {})
-    if not comp_footer.get('enabled', True):
+def _apply_component_header(components, styles, elements, color_profile, font_roles):
+    cfg = components["header"]
+    if not cfg.get("enabled", True):
         return
 
-    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M')
-    footer_text = comp_footer['text'].format(timestamp=timestamp)
+    if cfg.get("logo_path"):
+        _render_logo(cfg["logo_path"], elements, cfg.get("logo_width", 1.2), cfg.get("logo_alignment"))
 
-    footer_style = ParagraphStyle(
-        'ComponentFooter',
-        parent=styles['Normal'],
-        fontSize=comp_footer.get('font_size', 9),
-        textColor=colors.HexColor(comp_footer.get('color', '#666666')),
-        alignment=comp_footer.get('alignment', 1),
-        spaceBefore=12
+    style = ParagraphStyle(
+        "ComponentHeader",
+        parent=styles["Heading1"],
+        fontSize=cfg.get("font_size", 14),
+        fontName=font_roles.get("heading", "Helvetica-Bold"),
+        textColor=_parse_color(cfg.get("color"), color_profile),
+        alignment=_resolve_alignment(cfg.get("alignment")),
+        spaceAfter=12,
     )
-    elements.append(Spacer(1, 0.2 * inch))
-    elements.append(Paragraph(footer_text, footer_style))
+
+    elements.append(Paragraph(cfg.get("text", ""), style))
+    elements.append(Spacer(1, 0.15 * inch))
 
 
-def _apply_component_signature(components: Dict[str, Dict[str, Any]], styles, elements: List) -> None:
-    comp_sig = components.get('signature', {})
-    if not comp_sig.get('enabled', True):
+def _apply_component_footer(components, styles, elements, color_profile, font_roles):
+    cfg = components["footer"]
+    if not cfg.get("enabled", True):
         return
 
-    sig_parts = [
-        comp_sig.get('name', ''),
-        comp_sig.get('title', ''),
-        comp_sig.get('email', ''),
-        comp_sig.get('phone', '')
-    ]
-    sig_text = " | ".join([p for p in sig_parts if p])
+    text = cfg.get("text", "").format(timestamp=datetime.now().strftime("%Y-%m-%d %H:%M"))
 
-    sig_style = ParagraphStyle(
-        'ComponentSignature',
-        parent=styles['Normal'],
-        fontSize=comp_sig.get('font_size', 10),
+    style = ParagraphStyle(
+        "ComponentFooter",
+        parent=styles["Normal"],
+        fontSize=cfg.get("font_size", 9),
+        fontName=font_roles.get("body", "Helvetica"),
+        textColor=_parse_color(cfg.get("color"), color_profile),
+        alignment=_resolve_alignment(cfg.get("alignment")),
+        spaceBefore=12,
+    )
+
+    elements.append(Spacer(1, 0.2 * inch))
+    elements.append(Paragraph(text, style))
+
+
+def _apply_component_signature(components, styles, elements, font_roles):
+    cfg = components["signature"]
+    if not cfg.get("enabled", False):
+        return
+
+    text = " | ".join(
+        filter(
+            None,
+            [
+                cfg.get("name"),
+                cfg.get("title"),
+                cfg.get("email"),
+                cfg.get("phone"),
+            ],
+        )
+    )
+
+    style = ParagraphStyle(
+        "ComponentSignature",
+        parent=styles["Normal"],
+        fontSize=cfg.get("font_size", 10),
+        fontName=font_roles.get("body", "Helvetica"),
+        alignment=_resolve_alignment(cfg.get("alignment")),
         italic=True,
         spaceAfter=30,
-        alignment=2
     )
+
     elements.append(Spacer(1, 0.3 * inch))
-    elements.append(Paragraph(sig_text, sig_style))
+    elements.append(Paragraph(text, style))
 
 
-def _get_table_style_from_components(components: Dict[str, Dict[str, Any]],
-                                     config: Dict[str, Any]) -> TableStyle:
-    table_cfg = config.get('table', {})
-    comp_table = components.get('table_style', {})
+def _get_table_style_from_components(components, config, color_profile):
+    table_cfg = config.get("table", {})
+    comp = components["table_style"]
 
-    header_bg = table_cfg.get('header_bg', comp_table.get('header_bg', '#2C5282'))
-    header_text = table_cfg.get('header_text_color', comp_table.get('header_text', '#FFFFFF'))
-    row_colors_cfg = table_cfg.get('row_colors', comp_table.get('row_colors', ['#FFFFFF', '#F7FAFC']))
-    border_color = table_cfg.get('grid_color', comp_table.get('border_color', '#CCCCCC'))
+    row_colors = [
+        _parse_color(c, color_profile)
+        for c in table_cfg.get("row_colors", comp["row_colors"])
+    ]
 
-    return TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(header_bg)),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor(header_text)),
-        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), table_cfg.get('header_font_size', 12)),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('ALIGN', (0, 1), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 1), (-1, -1), table_cfg.get('font_size', 10)),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor(c) for c in row_colors_cfg]),
-        ('GRID', (0, 0), (-1, -1), 1, colors.HexColor(border_color)),
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('LEFTPADDING', (0, 0), (-1, -1), 6),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 6),
-    ])
+    return TableStyle(
+        [
+            ("BACKGROUND", (0, 0), (-1, 0), _parse_color(comp["header_bg"], color_profile)),
+            ("TEXTCOLOR", (0, 0), (-1, 0), _parse_color(comp["header_text"], color_profile)),
+            ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, 0), table_cfg.get("header_font_size", 12)),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), row_colors),
+            ("ALIGN", (0, 1), (-1, -1), "CENTER"),
+            ("GRID", (0, 0), (-1, -1), 1, _parse_color(comp["border_color"], color_profile)),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ]
+    )
+
+
+def _apply_body_content(body, config, styles, elements, color_profile, font_roles):
+    if not body:
+        return
+
+    cfg = config.get("body", {})
+    style = ParagraphStyle(
+        "BodyText",
+        parent=styles["Normal"],
+        fontName=font_roles.get("body", "Helvetica"),
+        fontSize=cfg.get("font_size", 11),
+        leading=cfg.get("leading", 1.4) * cfg.get("font_size", 11),
+        textColor=_parse_color(cfg.get("color"), color_profile),
+        alignment=_resolve_alignment(cfg.get("alignment", TA_JUSTIFY)),
+        spaceAfter=cfg.get("space_after", 12),
+    )
+
+    for para in body.split("\n\n"):
+        elements.append(Paragraph(para.replace("\n", "<br/>"), style))
 
 
 def generate_pdf_report(
-        title: str,
-        body: str,
-        report_data: str,
-        styling_config: str = "{}",
-        components_config: str = "{}",
-        include_header: bool = True
+    title: str,
+    body: str,
+    report_data: str,
+    styling_config: str = "{}",
+    components_config: str = "{}",
 ) -> str:
-    """
-    Generate a PDF with styling and reusable components (header, footer, signature, table_style).
-    """
     try:
-        # Parse inputs
         data = json.loads(report_data)
-        config: Dict[str, Any] = json.loads(styling_config) if styling_config else {}
-        components = parse_components_config(components_config)  # SELF-CONTAINED
+        config = json.loads(styling_config) if styling_config else {}
+        components = parse_components_config(components_config)
 
-        # Document setup
-        doc_cfg = config.get('document', {})
-        margin = doc_cfg.get('margin', 0.75) * inch
-        page_sizes = {
-            'letter': letter,
-            'A4': letter,
-            'legal': letter
-        }
-        page_size = page_sizes.get(doc_cfg.get('page_size', 'letter'), letter)
+        font_roles = _register_fonts(config.get("fonts", {}))
 
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"{title.replace(' ', '_')}_{timestamp}.pdf"
-        filepath = OUTPUT_DIR / filename
+        doc_cfg = config.get("document", {})
+        page_size = _get_page_size(doc_cfg)
 
         doc = SimpleDocTemplate(
-            str(filepath), pagesize=page_size,
-            rightMargin=margin, leftMargin=margin,
-            topMargin=margin, bottomMargin=margin
+            str(OUTPUT_DIR / f"{title.replace(' ', '_')}.pdf"),
+            pagesize=page_size,
+            topMargin=doc_cfg.get("margin_top", 0.75) * inch,
+            bottomMargin=doc_cfg.get("margin_bottom", 0.75) * inch,
+            leftMargin=doc_cfg.get("margin_left", 0.75) * inch,
+            rightMargin=doc_cfg.get("margin_right", 0.75) * inch,
         )
 
         styles = getSampleStyleSheet()
         elements: List[Any] = []
 
-        # HEADER
-        _apply_component_header(components, config, styles, elements)
+        _apply_component_header(components, styles, elements, "RGB", font_roles)
 
-        # Content (title, timestamp, sections/tables)
-        if include_header:
-            title_cfg = config.get('title', {})
-            title_style = ParagraphStyle(
-                'CustomHeaderTitle', parent=styles['Heading1'],
-                fontSize=title_cfg.get('font_size', 24),
-                textColor=colors.HexColor(title_cfg.get('color', '#1F3A93')),
-                spaceAfter=title_cfg.get('space_after', 6),
-                alignment=title_cfg.get('alignment', 1)
-            )
-            elements.append(Paragraph(body, title_style))
-            elements.append(Spacer(1, 0.2 * inch))
-
-        # Report title
-        report_title_cfg = config.get('report_title', {})
-        report_title_style = ParagraphStyle(
-            'CustomReportTitle', parent=styles['Heading2'],
-            fontSize=report_title_cfg.get('font_size', 18),
-            textColor=colors.HexColor(report_title_cfg.get('color', '#2C5282')),
-            spaceAfter=12
-        )
-        elements.append(Paragraph(title, report_title_style))
+        elements.append(Paragraph(title, styles["Heading2"]))
         elements.append(Spacer(1, 0.2 * inch))
 
-        # Timestamp
-        timestamp_cfg = config.get('timestamp', {})
-        timestamp_style = ParagraphStyle(
-            'CustomTimestamp', parent=styles['Normal'],
-            fontSize=timestamp_cfg.get('font_size', 10),
-            italic=timestamp_cfg.get('italic', True)
-        )
-        timestamp_text = f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-        elements.append(Paragraph(timestamp_text, timestamp_style))
-        elements.append(Spacer(1, 0.3 * inch))
+        _apply_body_content(body, config, styles, elements, "RGB", font_roles)
 
-        # Sections & Tables
-        if 'sections' in data:
-            for section in data['sections']:
-                section_cfg = config.get('section', {})
-                section_style = ParagraphStyle(
-                    'CustomSection', parent=styles['Heading3'],
-                    fontSize=section_cfg.get('font_size', 14),
-                    textColor=colors.HexColor(section_cfg.get('color', '#2D3748')),
-                    spaceAfter=section_cfg.get('space_after', 12)
-                )
-                elements.append(Paragraph(section.get('title', 'Section'), section_style))
+        for section in data.get("sections", []):
+            elements.append(Paragraph(section.get("title", "Section"), styles["Heading3"]))
 
-                if 'table_data' in section:
-                    table_data = section['table_data']
-                    if table_data:
-                        num_cols = len(table_data[0])
-                        col_widths = [2 * inch] * num_cols
-                        table_cfg = config.get('table', {})
-                        if 'col_widths' in table_cfg:
-                            col_widths = [w * inch for w in table_cfg['col_widths']]
+            if section.get("table_data"):
+                table = Table(section["table_data"])
+                table.setStyle(_get_table_style_from_components(components, config, "RGB"))
+                elements.append(table)
+                elements.append(Spacer(1, 0.2 * inch))
 
-                        table = Table(table_data, colWidths=col_widths)
-                        table_style = _get_table_style_from_components(components, config)
-                        table.setStyle(table_style)
-                        elements.append(table)
-                        elements.append(Spacer(1, 0.2 * inch))
-
-        # SIGNATURE
-        _apply_component_signature(components, styles, elements)
-
-        # FOOTER
-        _apply_component_footer(components, styles, elements)
+        _apply_component_signature(components, styles, elements, font_roles)
+        _apply_component_footer(components, styles, elements, "RGB", font_roles)
 
         doc.build(elements)
-        return f"✓ PDF with components: {filepath}"
+        return "✓ PDF generated successfully"
 
-    except json.JSONDecodeError as e:
-        return f"✗ Invalid JSON: {str(e)}"
     except Exception as e:
-        return f"✗ PDF Error: {str(e)}"
+        return f"✗ PDF Error: {e}"

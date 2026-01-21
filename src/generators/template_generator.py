@@ -16,6 +16,7 @@ class TemplateDocumentGenerator:
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
+
     def generate(
         self,
         template_path: Path,
@@ -25,15 +26,6 @@ class TemplateDocumentGenerator:
     ) -> str:
         """
         Generate a document from a template.
-
-        Args:
-            template_path: Path to .docx or .xlsx template
-            context: Dict {placeholder: resolved_value, ...}
-            output_filename: Custom filename
-            output_format:
-              - "docx": generate docx (requires docx template)
-              - "xlsx": generate xlsx (requires xlsx template)
-              - "pdf": generate docx then convert to PDF
         """
         if not template_path.exists():
             raise ValueError(f"Template not found: {template_path}")
@@ -75,6 +67,7 @@ class TemplateDocumentGenerator:
             raise ValueError("DOCX→PDF conversion failed")
         return pdf_path
 
+
     @staticmethod
     def _generate_docx(template_path: Path, context: Dict[str, Any], output_path: Path) -> None:
         try:
@@ -92,6 +85,7 @@ class TemplateDocumentGenerator:
         except Exception as e:
             raise ValueError(f"Failed to save DOCX document: {e}")
 
+
     def _generate_xlsx(self, template_path: Path, context: Dict[str, Any], output_path: Path) -> None:
         try:
             wb = load_workbook(str(template_path))
@@ -107,6 +101,7 @@ class TemplateDocumentGenerator:
             wb.save(str(output_path))
         except Exception as e:
             raise ValueError(f"Failed to save XLSX document: {e}")
+
 
     @staticmethod
     def _replace_scalars(ws, context: Dict[str, Any]) -> None:
@@ -127,6 +122,7 @@ class TemplateDocumentGenerator:
                     return "" if val is None else str(val)
 
                 cell.value = _PLACEHOLDER_RE.sub(replacer, cell.value)
+
 
     @staticmethod
     def _expand_table_placeholder(ws, context: Dict[str, Any]) -> None:

@@ -165,6 +165,7 @@ def generate_excel_report(
     columns_config: str = "{}",
     preset_theme: str = "",
 ) -> str:
+    """ Generate Excel."""
     try:
         headers_list: List[str] = _safe_json_loads(headers, default=[])
         data_list: List[List[Any]] = _safe_json_loads(data_rows, default=[])
@@ -228,9 +229,7 @@ def generate_excel_report(
         if tab_color:
             ws.sheet_properties.tabColor = _hex_to_rgb(tab_color, default="0070C0")
 
-        # -------------------
         # Header row
-        # -------------------
         if header_cfg.get("enabled", True):
             _set_row_height(ws, 1, header_cfg.get("height"))
             for col_num, header_text in enumerate(headers_list, 1):
@@ -242,9 +241,7 @@ def generate_excel_report(
                     merged = {**header_cfg, **col_override}
                     _apply_cell_format(cell, merged, base_border_cfg)
 
-        # -------------------
         # Data rows
-        # -------------------
         start_data_row = 2
         if data_cfg.get("enabled", True):
             for i, row_data in enumerate(data_list):
@@ -277,9 +274,7 @@ def generate_excel_report(
                             if nf:
                                 cell.number_format = nf
 
-        # -------------------
         # Totals row
-        # -------------------
         totals_row_idx = None
         if include_totals and totals_cfg_final.get("enabled", False) and data_list:
             totals_row_idx = start_data_row + len(data_list)
@@ -308,9 +303,7 @@ def generate_excel_report(
                 c = ws.cell(row=totals_row_idx, column=col_num, value=formula)
                 _apply_cell_format(c, totals_cfg_final, base_border_cfg)
 
-        # -------------------
         # Column widths / formats
-        # -------------------
         for col_num in range(1, len(headers_list) + 1):
             col_letter = get_column_letter(col_num)
             col_cfg = columns_cfg.get(col_letter, {}) or {}
@@ -321,16 +314,12 @@ def generate_excel_report(
                 # Default expected width
                 ws.column_dimensions[col_letter].width = 15
 
-        # -------------------
         # Freeze panes
-        # -------------------
         if include_freeze_panes and freeze_final.get("enabled", False):
             freeze_cell = freeze_final.get("freeze_cell") or "A2"
             ws.freeze_panes = freeze_cell
 
-        # -------------------
         # AutoFilter
-        # -------------------
         if include_autofilter and filter_final.get("enabled", False):
             total_rows = 1 + len(data_list)
             if totals_row_idx:
@@ -338,9 +327,7 @@ def generate_excel_report(
             ref = filter_final.get("range") or _cell_range_for_table(len(headers_list), total_rows)
             ws.auto_filter.ref = ref
 
-        # -------------------
         # Data validation
-        # -------------------
         if include_data_validation and validation_final.get("enabled", False):
             dv_type = validation_final.get("type", "list")
             dv_formula = validation_final.get("formula", '"Option1,Option2,Option3"')
@@ -367,9 +354,7 @@ def generate_excel_report(
             dv_range = validation_final.get("range") or f"B2:B{len(data_list) + 1}"
             dv.add(dv_range)
 
-        # -------------------
-        # Conditional formatting (color scale)
-        # -------------------
+        # Conditional formatting
         if include_conditional_formatting and conditional_final.get("enabled", False):
             cond_type = conditional_final.get("type", "colorScale")
             cond_range = conditional_final.get("range") or f"B2:{get_column_letter(len(headers_list))}{len(data_list) + 1}"

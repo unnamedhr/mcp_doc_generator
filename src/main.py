@@ -33,7 +33,7 @@ mcp.tool(generate_pdf_report)
 mcp.tool(generate_excel_report)
 mcp.tool(generate_word_report)
 mcp.tool(list_generated_documents)
-mcp.tool()(template_tools.generate_from_base64_template)
+mcp.tool()(template_tools.generate_from_template)
 
 if __name__ == "__main__":
     print("Document Generator MCP Server ready", file=sys.stderr)
