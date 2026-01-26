@@ -278,6 +278,7 @@ def generate_pdf_report(
     styling_config: str = "{}",
     components_config: str = "{}",
 ) -> str:
+    """ Generate PDF Report. """
     try:
         data = json.loads(report_data)
         config = json.loads(styling_config) if styling_config else {}
