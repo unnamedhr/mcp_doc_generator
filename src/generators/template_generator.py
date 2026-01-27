@@ -1,7 +1,11 @@
-from pathlib import Path
-from typing import Dict, Any, Optional, List
-from datetime import datetime
+from __future__ import annotations
+
+import base64
+import json
 import re
+from pathlib import Path
+from typing import Dict, Any, Optional, List, TypedDict, Union
+from datetime import datetime
 
 from docxtpl import DocxTemplate
 from openpyxl import load_workbook
@@ -9,10 +13,34 @@ from openpyxl import load_workbook
 _PLACEHOLDER_RE = re.compile(r"\{\{\s*([a-zA-Z_][a-zA-Z0-9_.]*)\s*}}")
 
 
+class TemplateResult(TypedDict):
+    type: str
+    filename: str
+    mime_type: str
+    base64: str
+    size_bytes: int
+    path: str
+    meta: Dict[str, Any]
+
+
+def _file_to_base64(path: Path) -> str:
+    return base64.b64encode(path.read_bytes()).decode("utf-8")
+
+
+def _mime_for(fmt: str) -> str:
+    fmt = fmt.lower()
+    if fmt == "docx":
+        return "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    if fmt == "xlsx":
+        return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    if fmt == "pdf":
+        return "application/pdf"
+    return "application/octet-stream"
+
 class TemplateDocumentGenerator:
     """Generate documents from .docx and .xlsx templates."""
 
-    def __init__(self, output_dir: Path):
+    def __init__(self, output_dir: Union[str, Path]):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -27,6 +55,13 @@ class TemplateDocumentGenerator:
         """
         Generate a document from a template.
         """
+        template_path = Path(template_path)
+
+        if isinstance(context, str):
+            context_dict = json.loads(context) if context.strip() else {}
+        else:
+            context_dict = context or {}
+
         if not template_path.exists():
             raise ValueError(f"Template not found: {template_path}")
 
@@ -50,6 +85,14 @@ class TemplateDocumentGenerator:
 
         output_path = self.output_dir / output_filename
 
+        # Filename
+        if not output_filename:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            ext = "pdf" if fmt == "pdf" else fmt
+            output_filename = f"generated_{timestamp}.{ext}"
+
+        output_path = self.output_dir / output_filename
+
         # Generate
         if fmt == "docx":
             self._generate_docx(template_path, context, output_path)
@@ -62,10 +105,56 @@ class TemplateDocumentGenerator:
         # Generate a temporary docx next to the output PDF, then convert.
         tmp_docx_path = output_path.with_suffix(".docx")
         self._generate_docx(template_path, context, tmp_docx_path)
+
         pdf_path = self.convert_to_pdf(tmp_docx_path)
         if not pdf_path:
-            raise ValueError("DOCX→PDF conversion failed")
+            raise ValueError("DOCX to PDF conversion failed")
         return pdf_path
+
+    def generate_base64(
+            self,
+            template_path: Union[str, Path],
+            context: Union[Dict[str, Any], str],
+            output_filename: Optional[str] = None,
+            output_format: Optional[str] = None,
+            max_bytes: int = 8 * 1024 * 1024,
+    ) -> TemplateResult:
+        """
+        MCP-friendly: generate and return base64 and metadata.
+        """
+        out_path_str = self.generate(
+            template_path=template_path,
+            context=context,
+            output_filename=output_filename,
+            output_format=output_format,
+        )
+
+        out_path = Path(out_path_str)
+        if not out_path.exists():
+            raise RuntimeError(f"Template generation succeeded but output not found: {out_path}")
+
+        file_bytes = out_path.read_bytes()
+
+        if len(file_bytes) > max_bytes:
+            raise RuntimeError(
+                f"Generated file is too large ({len(file_bytes)} bytes). Reduce template expansion or data."
+            )
+
+        fmt = out_path.suffix.lstrip(".").lower()
+
+        return {
+            "type": "file_base64",
+            "filename": out_path.name,
+            "path": str(out_path),
+            "mime_type": _mime_for(fmt),
+            "base64": base64.b64encode(file_bytes).decode("utf-8"),
+            "size_bytes": len(file_bytes),
+            "meta": {
+                "format": fmt,
+                "template": str(Path(template_path)),
+                "timestamp": datetime.now().strftime("%Y%m%d_%H%M%S"),
+            },
+        }
 
 
     @staticmethod
@@ -81,6 +170,7 @@ class TemplateDocumentGenerator:
             raise ValueError(f"Jinja2 render error: {e}")
 
         try:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
             tpl.save(str(output_path))
         except Exception as e:
             raise ValueError(f"Failed to save DOCX document: {e}")
@@ -98,6 +188,7 @@ class TemplateDocumentGenerator:
             self._expand_table_placeholder(ws, context)
 
         try:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
             wb.save(str(output_path))
         except Exception as e:
             raise ValueError(f"Failed to save XLSX document: {e}")
@@ -170,6 +261,7 @@ class TemplateDocumentGenerator:
         """Convert DOCX to PDF using LibreOffice."""
         import subprocess
 
+        docx_path = Path(docx_path)
         if not docx_path.exists():
             raise ValueError(f"File not found: {docx_path}")
 
@@ -185,10 +277,12 @@ class TemplateDocumentGenerator:
                 capture_output=True,
                 timeout=30
             )
-            if result.returncode == 0:
-                pdf_path = docx_path.with_suffix(".pdf")
-                return str(pdf_path)
-            return None
-        except Exception as e:
-            print(f"PDF conversion failed: {e}")
+
+            if result.returncode != 0:
+                return None
+
+            pdf_path = self.output_dir / f"{docx_path.stem}.pdf"
+            return str(pdf_path) if pdf_path.exists() else None
+
+        except Exception:
             return None

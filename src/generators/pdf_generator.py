@@ -1,4 +1,13 @@
-from typing import Union, Literal, Dict, Any, List
+from __future__ import annotations
+
+import base64
+import json
+import re
+import io
+from typing import Union, Literal, Dict, Any, List, Optional, TypedDict
+from datetime import datetime
+from pathlib import Path
+
 from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT, TA_JUSTIFY
 from reportlab.lib.units import inch
 from reportlab.pdfbase import pdfmetrics
@@ -14,30 +23,46 @@ from reportlab.platypus import (
     Image,
 )
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from datetime import datetime
-import json
-from pathlib import Path
 
-# Output directory
-OUTPUT_DIR = Path("./generated_documents")
-OUTPUT_DIR.mkdir(exist_ok=True)
+BASE_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR = BASE_DIR / "generated_documents"
 
 AlignmentValue = Union[int, str, None]
 ImageAlignOutput = Literal["LEFT", "CENTER", "CENTRE", "RIGHT"]
+
+
+class PdfResult(TypedDict):
+    type: str
+    filename: str
+    mime_type: str
+    base64: str
+    size_bytes: int
+    path: str
+    meta: Dict[str, Any]
+
+def _safe_filename(name: str) -> str:
+    s = (name or "document").strip()
+    s = re.sub(r"\s+", "_", s)
+    s = re.sub(r"[^A-Za-z0-9_\-\.]", "", s)
+    return s[:80] if s else "document"
+
+
+def _file_to_base64(path: Path) -> str:
+    return base64.b64encode(path.read_bytes()).decode("utf-8")
 
 
 def parse_components_config(components_json: str) -> Dict[str, Dict[str, Any]]:
     defaults = {
         "header": {
             "enabled": True,
-            "text": "Professional Report",
+            "text": "Generated Document",
             "font_size": 14,
-            "color": "#1F3A93",
+            "color": "#000000",
             "alignment": TA_CENTER,
         },
         "footer": {
             "enabled": True,
-            "text": "Confidential | {timestamp}",
+            "text": "Generated: {timestamp}",
             "font_size": 9,
             "color": "#666666",
             "alignment": TA_CENTER,
@@ -59,7 +84,7 @@ def parse_components_config(components_json: str) -> Dict[str, Dict[str, Any]]:
         return defaults
 
     try:
-        user_cfg = json.loads(components_json)
+        user_cfg = json.loads(components_json) if isinstance(components_json, str) else (components_json or {})
         merged = {}
         for key, base in defaults.items():
             merged[key] = {**base, **user_cfg.get(key, {})}
@@ -70,9 +95,9 @@ def parse_components_config(components_json: str) -> Dict[str, Dict[str, Any]]:
 
 def _register_fonts(font_cfg: Dict[str, Any]) -> Dict[str, str]:
     registered: Dict[str, str] = {}
-    for role, spec in font_cfg.items():
-        name = spec.get("name")
-        path = spec.get("ttf_path")
+    for role, spec in (font_cfg or {}).items():
+        name = (spec or {}).get("name")
+        path = (spec or {}).get("ttf_path")
         if not name or not path:
             continue
         try:
@@ -127,9 +152,9 @@ def _get_page_size(doc_cfg: Dict[str, Any]):
         "LETTER": letter,
         "A4": A4,
         "LEGAL": legal,
-    }.get(str(doc_cfg.get("page_size", "LETTER")).upper(), letter)
+    }.get(str((doc_cfg or {}).get("page_size", "LETTER")).upper(), letter)
 
-    if doc_cfg.get("orientation", "portrait").lower() == "landscape":
+    if str((doc_cfg or {}).get("orientation", "portrait")).lower() == "landscape":
         return landscape(base)
     return base
 
@@ -142,15 +167,26 @@ def _resolve_image_align(raw: AlignmentValue) -> ImageAlignOutput:
     return "LEFT"
 
 
-# Components
-def _render_logo(path: str, elements: List[Any], width_in: float, align):
-    p = Path(path)
-    if not p.exists():
+def _render_logo_base64(logo_base64: str, elements: List[Any], width_in: float, align):
+    if not logo_base64:
         return
-    img = Image(str(p), width=width_in * inch)
-    img.hAlign = _resolve_image_align(align)
-    elements.append(img)
-    elements.append(Spacer(1, 0.15 * inch))
+
+    try:
+        b64 = logo_base64.strip()
+
+        # Allow data URL formats
+        if b64.startswith("data:") and "base64," in b64:
+            b64 = b64.split("base64,", 1)[1].strip()
+
+        img_bytes = base64.b64decode(b64, validate=False)
+        img_buf = io.BytesIO(img_bytes)
+
+        img = Image(img_buf, width=width_in * inch)
+        img.hAlign = _resolve_image_align(align)
+        elements.append(img)
+        elements.append(Spacer(1, 0.15 * inch))
+    except Exception:
+        return
 
 
 def _apply_component_header(components, styles, elements, color_profile, font_roles):
@@ -158,8 +194,13 @@ def _apply_component_header(components, styles, elements, color_profile, font_ro
     if not cfg.get("enabled", True):
         return
 
-    if cfg.get("logo_path"):
-        _render_logo(cfg["logo_path"], elements, cfg.get("logo_width", 1.2), cfg.get("logo_alignment"))
+    if cfg.get("logo_base64"):
+        _render_logo_base64(
+            cfg["logo_base64"],
+            elements,
+            cfg.get("logo_width", 1.2),
+            cfg.get("logo_alignment"),
+        )
 
     style = ParagraphStyle(
         "ComponentHeader",
@@ -204,12 +245,7 @@ def _apply_component_signature(components, styles, elements, font_roles):
     text = " | ".join(
         filter(
             None,
-            [
-                cfg.get("name"),
-                cfg.get("title"),
-                cfg.get("email"),
-                cfg.get("phone"),
-            ],
+            [cfg.get("name"), cfg.get("title"), cfg.get("email"), cfg.get("phone")],
         )
     )
 
@@ -228,7 +264,7 @@ def _apply_component_signature(components, styles, elements, font_roles):
 
 
 def _get_table_style_from_components(components, config, color_profile):
-    table_cfg = config.get("table", {})
+    table_cfg = (config or {}).get("table", {})
     comp = components["table_style"]
 
     row_colors = [
@@ -255,7 +291,7 @@ def _apply_body_content(body, config, styles, elements, color_profile, font_role
     if not body:
         return
 
-    cfg = config.get("body", {})
+    cfg = (config or {}).get("body", {})
     style = ParagraphStyle(
         "BodyText",
         parent=styles["Normal"],
@@ -272,25 +308,26 @@ def _apply_body_content(body, config, styles, elements, color_profile, font_role
 
 
 def _generate_pdf_report_internal(
+        out_path: Path,
         title: str,
         body: str,
         report_data: str,
         styling_config: str = "{}",
         components_config: str = "{}",
-) -> str:
+) -> Path:
     """Internal PDF generation implementation."""
     try:
-        data = json.loads(report_data)
-        config = json.loads(styling_config) if styling_config else {}
+        data = json.loads(report_data) if isinstance(report_data, str) else (report_data or {})
+        config = json.loads(styling_config) if isinstance(styling_config, str) and styling_config else (styling_config or {})
         components = parse_components_config(components_config)
 
-        font_roles = _register_fonts(config.get("fonts", {}))
+        font_roles = _register_fonts((config or {}).get("fonts", {}))
 
-        doc_cfg = config.get("document", {})
+        doc_cfg = (config or {}).get("document", {})
         page_size = _get_page_size(doc_cfg)
 
         doc = SimpleDocTemplate(
-            str(OUTPUT_DIR / f"{title.replace(' ', '_')}.pdf"),
+            str(out_path),
             pagesize=page_size,
             topMargin=doc_cfg.get("margin_top", 0.75) * inch,
             bottomMargin=doc_cfg.get("margin_bottom", 0.75) * inch,
@@ -308,7 +345,7 @@ def _generate_pdf_report_internal(
 
         _apply_body_content(body, config, styles, elements, "RGB", font_roles)
 
-        for section in data.get("sections", []):
+        for section in (data or {}).get("sections", []):
             elements.append(Paragraph(section.get("title", "Section"), styles["Heading3"]))
 
             if section.get("table_data"):
@@ -321,18 +358,18 @@ def _generate_pdf_report_internal(
         _apply_component_footer(components, styles, elements, "RGB", font_roles)
 
         doc.build(elements)
-        return "✓ PDF generated successfully"
+        return out_path
 
     except Exception as e:
         raise ValueError(f"PDF generation failed: {str(e)}")
 
 
 def generate_pdf(
-        template_path: str = None,
-        output_path: str = None,
-        data: Dict[str, Any] = None,
+        template_path: Optional[str] = None,
+        output_path: Optional[str] = None,
+        data: Optional[Dict[str, Any]] = None,
         **kwargs
-) -> str:
+) -> PdfResult:
     """
     Wrapper for PDF generation.
     """
@@ -347,26 +384,58 @@ def generate_pdf(
         styling_config = data.get("styling_config", "{}")
         components_config = data.get("components_config", "{}")
 
-        # Convert dict inputs to JSON strings (agent may send nested objects)
-        if isinstance(report_data, dict):
-            report_data = json.dumps(report_data)
-        if isinstance(styling_config, dict):
-            styling_config = json.dumps(styling_config)
-        if isinstance(components_config, dict):
-            components_config = json.dumps(components_config)
+        # Convert dict inputs to JSON strings
+        if isinstance(report_data, str):
+            report_data_str = report_data
+        else:
+            report_data_str = json.dumps(report_data)
 
-        # Call internal generator
-        result = _generate_pdf_report_internal(
+        if isinstance(styling_config, str):
+            styling_config_str = styling_config
+        else:
+            styling_config_str = json.dumps(styling_config)
+
+        if isinstance(components_config, str):
+            components_config_str = components_config
+        else:
+            components_config_str = json.dumps(components_config)
+
+        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        safe = _safe_filename(title)
+        filename = f"{safe}_{timestamp}.pdf"
+        out_path = Path(output_path) if output_path else (OUTPUT_DIR / filename)
+
+        # Generate PDF file
+        generated_path = _generate_pdf_report_internal(
+            out_path=out_path,
             title=title,
             body=body,
-            report_data=report_data,
-            styling_config=styling_config,
-            components_config=components_config
+            report_data=report_data_str,
+            styling_config=styling_config_str,
+            components_config=components_config_str,
         )
 
-        filepath = OUTPUT_DIR / f"{title.replace(' ', '_')}.pdf"
-        content_length = len(body)
-        return f"PDF generated: {filepath} | Content: {content_length} chars | Status: {result}"
+        # Read file & encode
+        file_bytes = generated_path.read_bytes()
 
+        MAX_BYTES = 8 * 1024 * 1024
+        if len(file_bytes) > MAX_BYTES:
+            raise RuntimeError(f"Generated PDF is too large ({len(file_bytes)} bytes). Reduce content or tables.")
+
+        return {
+            "type": "file_base64",
+            "filename": generated_path.name,
+            "path": str(generated_path),
+            "mime_type": "application/pdf",
+            "base64": base64.b64encode(file_bytes).decode("utf-8"),
+            "size_bytes": len(file_bytes),
+            "meta": {
+                "title": title,
+                "body_chars": len(body or ""),
+                "sections": len(json.loads(report_data_str).get("sections", [])) if report_data_str else 0,
+                "timestamp": timestamp,
+            },
+        }
     except Exception as e:
         raise RuntimeError(f"PDF generation failed: {str(e)}")

@@ -1,9 +1,12 @@
 from __future__ import annotations
+
+import base64
 import json
 import re
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, List, Optional, TypedDict
+
 from openpyxl import Workbook
 from openpyxl.formatting.rule import ColorScaleRule
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -18,11 +21,14 @@ from src.components.templates.excel import (
 
 class ExcelResult(TypedDict):
     type: str
-    path: str
+    filename: str
     mime_type: str
+    base64: str
+    size_bytes: int
     rows: int
     columns: int
     sheet_name: str
+    path: str
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -152,6 +158,18 @@ def _cell_range_for_table(num_cols: int, num_rows: int) -> str:
     return f"A1:{last_col}{last_row}"
 
 
+def _safe_filename(name: str) -> str:
+    s = (name or "document").strip()
+    s = re.sub(r"\s+", "_", s)
+    s = re.sub(r"[^A-Za-z0-9_\-\.]", "", s)
+    return s[:80] if s else "document"
+
+
+def _file_to_base64(path: Path) -> str:
+    data = path.read_bytes()
+    return base64.b64encode(data).decode("utf-8")
+
+
 def generate_excel(
     title: str,
     sheet_name: str,
@@ -172,7 +190,7 @@ def generate_excel(
     columns_config: str = "{}",
     preset_theme: str = "",
 ) -> ExcelResult:
-    """ Generate Excel."""
+    """ Generate an Excel file and return base64 content and metadata."""
     try:
         headers_list: List[str] = _safe_json_loads(headers, default=[])
         data_list: List[List[Any]] = _safe_json_loads(data_rows, default=[])
@@ -226,12 +244,13 @@ def generate_excel(
         # Create workbook/sheet
         wb = Workbook()
         ws = wb.active
-        ws.title = (sheet_final.get("name") or sheet_name)[:31]
+        ws.title = (sheet_final.get("name") or sheet_name or "Sheet1")[:31]
 
         # Apply sheet state and tab colour
         state = sheet_final.get("state")
         if state in ("visible", "hidden", "veryHidden"):
             ws.sheet_state = state
+
         tab_color = sheet_final.get("tab_color")
         if tab_color:
             ws.sheet_properties.tabColor = _hex_to_rgb(tab_color, default="0070C0")
@@ -254,8 +273,8 @@ def generate_excel(
             for i, row_data in enumerate(data_list):
                 row_num = start_data_row + i
                 _set_row_height(ws, row_num, data_cfg.get("height"))
-
                 is_alternating = (i % 2 == 1)
+
                 for col_num, value in enumerate(row_data, 1):
                     # Ensure formulas are stored as formulas (must start with "=")
                     if isinstance(value, str):
@@ -310,7 +329,7 @@ def generate_excel(
                 c = ws.cell(row=totals_row_idx, column=col_num, value=formula)
                 _apply_cell_format(c, totals_cfg_final, base_border_cfg)
 
-        # Column widths / formats
+        # Column widths
         for col_num in range(1, len(headers_list) + 1):
             col_letter = get_column_letter(col_num)
             col_cfg = columns_cfg.get(col_letter, {}) or {}
@@ -318,7 +337,6 @@ def generate_excel(
             if "width" in col_cfg and col_cfg["width"]:
                 ws.column_dimensions[col_letter].width = float(col_cfg["width"])
             else:
-                # Default expected width
                 ws.column_dimensions[col_letter].width = 15
 
         # Freeze panes
@@ -379,21 +397,29 @@ def generate_excel(
                 ws.conditional_formatting.add(cond_range, color_scale)
 
         # Save file
+        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"{title.replace(' ', '_')}_{timestamp}.xlsx"
+        base_name = _safe_filename(title)
+        filename = f"{base_name}_{timestamp}.xlsx"
         filepath = OUTPUT_DIR / filename
         wb.save(str(filepath))
 
+        # Return base64 content
+        file_bytes = filepath.read_bytes()
+        b64 = _file_to_base64(filepath)
+
         return {
-            "type": "file",
+            "type": "file_base64",
+            "filename": filename,
             "path": str(filepath),
             "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "base64": b64,
+            "size_bytes": len(file_bytes),
             "rows": len(data_list),
             "columns": len(headers_list),
             "sheet_name": ws.title,
         }
-
-
 
     except json.JSONDecodeError as e:
         raise ValueError(f"Invalid JSON input: {str(e)}")
