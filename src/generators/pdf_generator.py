@@ -271,14 +271,14 @@ def _apply_body_content(body, config, styles, elements, color_profile, font_role
         elements.append(Paragraph(para.replace("\n", "<br/>"), style))
 
 
-def generate_pdf_report(
-    title: str,
-    body: str,
-    report_data: str,
-    styling_config: str = "{}",
-    components_config: str = "{}",
+def _generate_pdf_report_internal(
+        title: str,
+        body: str,
+        report_data: str,
+        styling_config: str = "{}",
+        components_config: str = "{}",
 ) -> str:
-    """ Generate PDF Report. """
+    """Internal PDF generation implementation."""
     try:
         data = json.loads(report_data)
         config = json.loads(styling_config) if styling_config else {}
@@ -324,4 +324,49 @@ def generate_pdf_report(
         return "✓ PDF generated successfully"
 
     except Exception as e:
-        return f"✗ PDF Error: {e}"
+        raise ValueError(f"PDF generation failed: {str(e)}")
+
+
+def generate_pdf(
+        template_path: str = None,
+        output_path: str = None,
+        data: Dict[str, Any] = None,
+        **kwargs
+) -> str:
+    """
+    Wrapper for PDF generation.
+    """
+    if not data:
+        raise ValueError("Missing 'data' parameter with PDF configuration")
+
+    try:
+        # Extract parameters from data dict
+        title = data.get("title", "Report")
+        body = data.get("body", "")
+        report_data = data.get("report_data", "{}")
+        styling_config = data.get("styling_config", "{}")
+        components_config = data.get("components_config", "{}")
+
+        # Convert dict inputs to JSON strings (agent may send nested objects)
+        if isinstance(report_data, dict):
+            report_data = json.dumps(report_data)
+        if isinstance(styling_config, dict):
+            styling_config = json.dumps(styling_config)
+        if isinstance(components_config, dict):
+            components_config = json.dumps(components_config)
+
+        # Call internal generator
+        result = _generate_pdf_report_internal(
+            title=title,
+            body=body,
+            report_data=report_data,
+            styling_config=styling_config,
+            components_config=components_config
+        )
+
+        filepath = OUTPUT_DIR / f"{title.replace(' ', '_')}.pdf"
+        content_length = len(body)
+        return f"PDF generated: {filepath} | Content: {content_length} chars | Status: {result}"
+
+    except Exception as e:
+        raise RuntimeError(f"PDF generation failed: {str(e)}")

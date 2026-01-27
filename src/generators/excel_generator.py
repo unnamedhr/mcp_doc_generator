@@ -1,22 +1,32 @@
 from __future__ import annotations
-
 import json
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, List, Optional
-
+from typing import Dict, Any, List, Optional, TypedDict
 from openpyxl import Workbook
 from openpyxl.formatting.rule import ColorScaleRule
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 
-from components.templates.excel import ExcelComponentsBase, ExcelPresets, ExcelStyles
+from src.components.templates.excel import (
+    ExcelComponentsBase,
+    ExcelPresets,
+    ExcelStyles,
+)
+
+class ExcelResult(TypedDict):
+    type: str
+    path: str
+    mime_type: str
+    rows: int
+    columns: int
+    sheet_name: str
 
 
-OUTPUT_DIR = Path("./generated_documents")
-OUTPUT_DIR.mkdir(exist_ok=True)
+BASE_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR = BASE_DIR / "generated_documents"
 
 
 def _safe_json_loads(value: Any, default):
@@ -47,9 +57,7 @@ def _normalize_number_format(fmt: Optional[str]) -> Optional[str]:
         return None
 
     s = str(fmt).strip()
-    # If it's already a classic Excel format string, keep it.
     if any(ch in s for ch in ["#", "0", "%", "€", "$"]) or s.lower() in ["general"]:
-        # But avoid passing through "number:0" etc.
         if ":" not in s:
             return s
 
@@ -139,13 +147,12 @@ def _set_row_height(ws, row_idx: int, height: Optional[float]):
 
 
 def _cell_range_for_table(num_cols: int, num_rows: int) -> str:
-    # includes the header row
     last_col = get_column_letter(num_cols)
     last_row = num_rows
     return f"A1:{last_col}{last_row}"
 
 
-def generate_excel_report(
+def generate_excel(
     title: str,
     sheet_name: str,
     headers: str,
@@ -164,7 +171,7 @@ def generate_excel_report(
     conditional_config: str = "{}",
     columns_config: str = "{}",
     preset_theme: str = "",
-) -> str:
+) -> ExcelResult:
     """ Generate Excel."""
     try:
         headers_list: List[str] = _safe_json_loads(headers, default=[])
@@ -377,9 +384,19 @@ def generate_excel_report(
         filepath = OUTPUT_DIR / filename
         wb.save(str(filepath))
 
-        return f"✓ Excel generated: {filepath} | Rows: {len(data_list)}, Cols: {len(headers_list)}"
+        return {
+            "type": "file",
+            "path": str(filepath),
+            "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "rows": len(data_list),
+            "columns": len(headers_list),
+            "sheet_name": ws.title,
+        }
+
+
 
     except json.JSONDecodeError as e:
-        return f"✗ JSON Error: {str(e)}"
+        raise ValueError(f"Invalid JSON input: {str(e)}")
+
     except Exception as e:
-        return f"✗ Error generating Excel: {str(e)}"
+        raise RuntimeError(f"Excel generation failed: {str(e)}")

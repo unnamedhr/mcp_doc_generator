@@ -9,6 +9,7 @@ from .enums import (
     SortOrder,
     ImagePosition
 )
+import re
 from .styles import ExcelStyles
 
 class ExcelComponentsBase:

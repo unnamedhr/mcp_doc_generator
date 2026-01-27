@@ -52,7 +52,6 @@ def ensure_character_style(doc, name, base=None, bold=False, italic=False):
 
 
 def initialize_styles(doc):
-
     ensure_paragraph_style(doc, "Title", size=18, bold=True)
     ensure_paragraph_style(doc, "Body Text", size=11)
     ensure_paragraph_style(doc, "Caption", size=9)
@@ -122,8 +121,8 @@ def repeat_table_header(row):
     trPr.append(header)
 
 
-# Document generator
-def generate_word_report(
+# Internal document generator
+def _generate_word_report_internal(
         title: str,
         subtitle: str,
         content: str,
@@ -131,7 +130,7 @@ def generate_word_report(
         page_margins: str = "{}"
 ) -> str:
     """
-    Generate Word document (.docx).
+    Internal Word document generation implementation.
     """
     try:
         content_data = json.loads(content)
@@ -202,7 +201,56 @@ def generate_word_report(
         path = OUTPUT_DIR / filename
         doc.save(path)
 
-        return f"✓ Word document generated successfully: {path}"
+        return str(path)
 
     except Exception as e:
-        return f"✗ Error: {e}"
+        raise ValueError(f"Word generation failed: {str(e)}")
+
+
+def generate_word_report(
+        template_path: str = None,
+        output_path: str = None,
+        data: Dict[str, Any] = None,
+        **kwargs
+) -> str:
+    """
+    Wrapper for Word document generation.
+    """
+    if not data:
+        raise ValueError("Missing 'data' parameter with Word document configuration")
+
+    try:
+        # Extract parameters from data dict
+        title = data.get("title", "Document")
+        subtitle = data.get("subtitle", "")
+        content = data.get("content", "{}")
+        styling_config = data.get("styling_config", "{}")
+        page_margins = data.get("page_margins", "{}")
+
+        # Convert dict inputs to JSON strings (agent may send nested objects)
+        if isinstance(content, dict):
+            content = json.dumps(content)
+        if isinstance(styling_config, dict):
+            styling_config = json.dumps(styling_config)
+        if isinstance(page_margins, dict):
+            page_margins = json.dumps(page_margins)
+
+        # Call internal generator
+        filepath = _generate_word_report_internal(
+            title=title,
+            subtitle=subtitle,
+            content=content,
+            styling_config=styling_config,
+            page_margins=page_margins
+        )
+
+        try:
+            content_data = json.loads(content) if isinstance(content, str) else content
+            section_count = len(content_data.get("sections", []))
+        except:
+            section_count = 0
+
+        return f"Word document generated: {filepath} | Sections: {section_count} | Title: {title}"
+
+    except Exception as e:
+        raise RuntimeError(f"Word generation failed: {str(e)}")
