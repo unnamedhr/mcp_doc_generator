@@ -9,32 +9,31 @@ import { fileURLToPath } from "node:url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// dist/index.js -> project root
 const projectRoot = resolve(__dirname, "..");
 const bridgePath = resolve(projectRoot, "mcp_bridge.py");
 
 function callPython(toolName: string, payload: unknown) {
   const python = process.env.PYTHON || "python";
 
-  const res = spawnSync(
-    python,
-    [bridgePath, toolName],
-    { input: JSON.stringify(payload ?? {}), encoding: "utf-8" }
-  );
+  const res = spawnSync(python, [bridgePath, toolName], {
+    input: JSON.stringify(payload ?? {}),
+    encoding: "utf-8",
+    cwd: projectRoot,
+  });
 
   if (res.status !== 0) {
-    const msg = [res.stderr?.trim(), res.stdout?.trim()]
-      .filter(Boolean)
-      .join("\n") || "Python tool failed";
+    const msg =
+      [res.stderr?.trim(), res.stdout?.trim()].filter(Boolean).join("\n") ||
+      "Document Generator tool failed";
     throw new Error(msg);
   }
 
   const out = (res.stdout || "").trim();
-  if (!out) throw new Error("Empty response from Python tool");
+  if (!out) throw new Error("Empty response from Document Generator tool");
 
   try {
     return JSON.parse(out);
-  } catch (e) {
+  } catch {
     throw new Error(`Python returned non-JSON output:\n${out}`);
   }
 }
@@ -44,19 +43,13 @@ const server = new McpServer({
   version: "0.1.0",
 });
 
-const ToolPayload = z.object({ data: z.any() });
-
-function parseToolArgs(params: unknown) {
-  const maybeObj = (params ?? {}) as any;
-  const raw = maybeObj.arguments ?? maybeObj;
-  return ToolPayload.parse(raw);
-}
+const ToolInputShape = { data: z.any() };
 
 server.tool(
   "excel_generator",
   "Generate an Excel (.xlsx)",
-  async (params: unknown) => {
-    const { data } = parseToolArgs(params);
+  ToolInputShape,
+  async ({ data }) => {
     const result = callPython("excel_generator", { data });
     return { content: [{ type: "text", text: JSON.stringify(result) }] };
   }
@@ -64,9 +57,9 @@ server.tool(
 
 server.tool(
   "pdf_generator",
-  "Generate a PDF.",
-  async (params: unknown) => {
-    const { data } = parseToolArgs(params);
+  "Generate a PDF",
+  ToolInputShape,
+  async ({ data }) => {
     const result = callPython("pdf_generator", { data });
     return { content: [{ type: "text", text: JSON.stringify(result) }] };
   }
@@ -75,8 +68,8 @@ server.tool(
 server.tool(
   "word_generator",
   "Generate a Word (.docx)",
-  async (params: unknown) => {
-    const { data } = parseToolArgs(params);
+  ToolInputShape,
+  async ({ data }) => {
     const result = callPython("word_generator", { data });
     return { content: [{ type: "text", text: JSON.stringify(result) }] };
   }
@@ -84,9 +77,9 @@ server.tool(
 
 server.tool(
   "template_generator",
-  "Generate a document from a template.",
-  async (params: unknown) => {
-    const { data } = parseToolArgs(params);
+  "Generate a document from a template",
+  ToolInputShape,
+  async ({ data }) => {
     const result = callPython("template_generator", { data });
     return { content: [{ type: "text", text: JSON.stringify(result) }] };
   }
