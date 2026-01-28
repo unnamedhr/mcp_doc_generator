@@ -27,8 +27,8 @@ def _file_to_base64(path: Path) -> str:
     return base64.b64encode(path.read_bytes()).decode("utf-8")
 
 
-def _mime_for(fmt: str) -> str:
-    fmt = fmt.lower()
+def mime_for(fmt: str) -> str:
+    fmt = (fmt or "").lower()
     if fmt == "docx":
         return "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     if fmt == "xlsx":
@@ -36,6 +36,7 @@ def _mime_for(fmt: str) -> str:
     if fmt == "pdf":
         return "application/pdf"
     return "application/octet-stream"
+
 
 class TemplateDocumentGenerator:
     """Generate documents from .docx and .xlsx templates."""
@@ -85,26 +86,18 @@ class TemplateDocumentGenerator:
 
         output_path = self.output_dir / output_filename
 
-        # Filename
-        if not output_filename:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            ext = "pdf" if fmt == "pdf" else fmt
-            output_filename = f"generated_{timestamp}.{ext}"
-
-        output_path = self.output_dir / output_filename
-
         # Generate
         if fmt == "docx":
-            self._generate_docx(template_path, context, output_path)
+            self._generate_docx(template_path, context_dict, output_path)
             return str(output_path)
 
         if fmt == "xlsx":
-            self._generate_xlsx(template_path, context, output_path)
+            self._generate_xlsx(template_path, context_dict, output_path)
             return str(output_path)
 
         # Generate a temporary docx next to the output PDF, then convert.
         tmp_docx_path = output_path.with_suffix(".docx")
-        self._generate_docx(template_path, context, tmp_docx_path)
+        self._generate_docx(template_path, context_dict, tmp_docx_path)
 
         pdf_path = self.convert_to_pdf(tmp_docx_path)
         if not pdf_path:
@@ -146,7 +139,7 @@ class TemplateDocumentGenerator:
             "type": "file_base64",
             "filename": out_path.name,
             "path": str(out_path),
-            "mime_type": _mime_for(fmt),
+            "mime_type": mime_for(fmt),
             "base64": base64.b64encode(file_bytes).decode("utf-8"),
             "size_bytes": len(file_bytes),
             "meta": {

@@ -31,9 +31,10 @@ class ExcelResult(TypedDict):
     path: str
 
 
-BASE_DIR = Path(__file__).resolve().parent
-OUTPUT_DIR = BASE_DIR / "generated_documents"
-
+REPO_ROOT = Path(__file__).resolve()
+REPO_ROOT = REPO_ROOT.parents[2]
+OUTPUT_DIR = REPO_ROOT / "generated_documents"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 def _safe_json_loads(value: Any, default):
     if value is None:
@@ -165,16 +166,11 @@ def _safe_filename(name: str) -> str:
     return s[:80] if s else "document"
 
 
-def _file_to_base64(path: Path) -> str:
-    data = path.read_bytes()
-    return base64.b64encode(data).decode("utf-8")
-
-
 def generate_excel(
     title: str,
     sheet_name: str,
-    headers: str,
-    data_rows: str,
+    headers: Any,
+    data_rows: Any,
     styling_config: str = "{}",
     sheet_config: str = "{}",
     include_totals: bool = False,
@@ -194,8 +190,27 @@ def generate_excel(
     try:
         headers_list: List[str] = _safe_json_loads(headers, default=[])
         data_list: List[List[Any]] = _safe_json_loads(data_rows, default=[])
-        columns_cfg: Dict[str, Any] = _safe_json_loads(columns_config, default={})
 
+        if not headers_list:
+            max_cols = max((len(row) for row in data_list), default=0)
+            headers_list = [f"Column {i + 1}" for i in range(max_cols)]
+        else:
+            headers_list = [str(h) for h in headers_list]
+
+        # Ensure all rows have the same number of columns as headers
+        if headers_list:
+            target_cols = len(headers_list)
+            normalized_rows: List[List[Any]] = []
+            for row in data_list:
+                row = list(row) if isinstance(row, (list, tuple)) else [row]
+                if len(row) < target_cols:
+                    row = row + [""] * (target_cols - len(row))
+                elif len(row) > target_cols:
+                    row = row[:target_cols]
+                normalized_rows.append(row)
+            data_list = normalized_rows
+
+        columns_cfg: Dict[str, Any] = _safe_json_loads(columns_config, default={})
         raw_sheet_cfg: Dict[str, Any] = _safe_json_loads(sheet_config, default={})
         raw_totals_cfg: Dict[str, Any] = _safe_json_loads(totals_config, default={})
         raw_validation_cfg: Dict[str, Any] = _safe_json_loads(validation_config, default={})
@@ -407,7 +422,7 @@ def generate_excel(
 
         # Return base64 content
         file_bytes = filepath.read_bytes()
-        b64 = _file_to_base64(filepath)
+        b64 = base64.b64encode(file_bytes).decode("utf-8")
 
         return {
             "type": "file_base64",

@@ -24,8 +24,10 @@ from reportlab.platypus import (
 )
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
-BASE_DIR = Path(__file__).resolve().parent
-OUTPUT_DIR = BASE_DIR / "generated_documents"
+REPO_ROOT = Path(__file__).resolve()
+REPO_ROOT = REPO_ROOT.parents[2]
+OUTPUT_DIR = REPO_ROOT / "generated_documents"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 AlignmentValue = Union[int, str, None]
 ImageAlignOutput = Literal["LEFT", "CENTER", "CENTRE", "RIGHT"]
@@ -45,10 +47,6 @@ def _safe_filename(name: str) -> str:
     s = re.sub(r"\s+", "_", s)
     s = re.sub(r"[^A-Za-z0-9_\-\.]", "", s)
     return s[:80] if s else "document"
-
-
-def _file_to_base64(path: Path) -> str:
-    return base64.b64encode(path.read_bytes()).decode("utf-8")
 
 
 def parse_components_config(components_json: str) -> Dict[str, Dict[str, Any]]:
@@ -80,7 +78,10 @@ def parse_components_config(components_json: str) -> Dict[str, Dict[str, Any]]:
         },
     }
 
-    if not components_json or components_json.strip() == "{}":
+    if not components_json:
+        return defaults
+
+    if isinstance(components_json, str) and components_json.strip() == "{}":
         return defaults
 
     try:
@@ -400,7 +401,6 @@ def generate_pdf(
         else:
             components_config_str = json.dumps(components_config)
 
-        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         safe = _safe_filename(title)
         filename = f"{safe}_{timestamp}.pdf"

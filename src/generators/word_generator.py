@@ -15,8 +15,10 @@ from docx.enum.style import WD_STYLE_TYPE
 from docx.oxml.ns import qn
 from docx.oxml.shared import OxmlElement
 
-BASE_DIR = Path(__file__).resolve().parent
-OUTPUT_DIR = BASE_DIR / "generated_documents"
+REPO_ROOT = Path(__file__).resolve()
+REPO_ROOT = REPO_ROOT.parents[2]
+OUTPUT_DIR = REPO_ROOT / "generated_documents"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 class WordResult(TypedDict):
     type: str
@@ -50,7 +52,7 @@ def _file_to_base64(path: Path) -> str:
     return base64.b64encode(path.read_bytes()).decode("utf-8")
 
 
-def parse_style_config(styling_config: str) -> WordStyleConfig:
+def parse_style_config(styling_config: Any) -> WordStyleConfig:
     if not styling_config or styling_config == "{}":
         return WordStyleConfig()
     if isinstance(styling_config, dict):
@@ -214,7 +216,6 @@ def _generate_word_report_internal(
                     for c, value in enumerate(row):
                         cell = table.rows[r].cells[c]
                         cell.text = str(value)
-
                         if r == 0:
                             set_cell_shading(cell, style_config.table.get("header_shading", "2C5282"))
 
