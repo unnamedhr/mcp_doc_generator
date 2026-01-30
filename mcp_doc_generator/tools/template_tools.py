@@ -7,9 +7,9 @@ from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field
 from docxtpl import DocxTemplate
 from openpyxl import load_workbook
-from components.template_config.mapping_resolver import MappingResolver
-from generators.template_generator import TemplateDocumentGenerator, mime_for
-from utils.template_utils import (
+from mcp_doc_generator.components.template_config.mapping_resolver import MappingResolver
+from mcp_doc_generator.generators.template_generator import TemplateDocumentGenerator, mime_for
+from mcp_doc_generator.utils.template_utils import (
     create_temp_template_from_base64,
     safe_render_template,
     format_mapping_for_display,

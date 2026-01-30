@@ -8,11 +8,11 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src"))
 
-from src.generators.excel_generator import generate_excel
-from src.generators.pdf_generator import generate_pdf
-from src.generators.word_generator import generate_word
-from src.generators.template_generator import TemplateDocumentGenerator
-from src.tools.template_tools import TemplateTools, GenerateFromBase64TemplateReq
+from mcp_doc_generator.generators.excel_generator import generate_excel
+from mcp_doc_generator.generators.pdf_generator import generate_pdf
+from mcp_doc_generator.generators.word_generator import generate_word
+from mcp_doc_generator.generators.template_generator import TemplateDocumentGenerator
+from mcp_doc_generator.tools.template_tools import TemplateTools, GenerateFromBase64TemplateReq
 
 OUTPUT_DIR = Path(os.getenv("MCP_DOC_OUTPUT_PATH", str(ROOT / "generated_documents")))
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)

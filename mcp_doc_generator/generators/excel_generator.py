@@ -13,7 +13,7 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 
-from src.components.templates.excel import (
+from mcp_doc_generator.components.templates.excel import (
     ExcelComponentsBase,
     ExcelPresets,
     ExcelStyles,
