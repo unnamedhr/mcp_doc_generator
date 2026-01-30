@@ -1,11 +1,12 @@
 [project]
 name = "mcp-doc-generator"
-version = "0.1.0"
+version = "0.1.2"
 description = "MCP server for generating PDF/Word/Excel documents from structured input."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
-  "fastmcp[cli]==2.14.3",
+  "fastmcp==2.14.3",
+  "packaging>=23.0",
   "reportlab==4.4.7",
   "openpyxl==3.1.5",
   "python-docx==1.2.0",
