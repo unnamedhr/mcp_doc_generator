@@ -1,29 +1,37 @@
 #!/usr/bin/env node
-import {spawn} from "node:child_process";
+import { spawn } from "node:child_process";
 
 function run() {
-    const cmd = process.env.MCP_UVX || "uvx";
-    const args = ["mcp-doc-generator"];
+  const uvx = process.env.MCP_UVX || "uvx";
+  const from = process.env.MCP_DOC_GENERATOR_FROM;
 
-    const child = spawn(cmd, args, {
-        stdio: ["pipe", "pipe", "pipe"],
-        env: process.env,
-    });
+  if (!from) {
+    process.stderr.write(
+      "Missing MCP_DOC_GENERATOR_FROM.\n" +
+        "Set it to your GitLab source, e.g.\n" +
+        "  git+https://oauth2:${GITLAB_TOKEN}@gitlab.scheer-group.com/fatima.zivkovic/mcp_doc_generator.git@v0.1.3\n"
+    );
+    process.exit(1);
+  }
 
-    process.stdin.pipe(child.stdin);
-    child.stdout.pipe(process.stdout);
-    child.stderr.pipe(process.stderr);
+  const args = ["--from", from, "mcp-doc-generator"];
 
-    child.on("exit", (code) => process.exit(code ?? 1));
-    child.on("error", (err) => {
-        process.stderr.write(
-            `Failed to start uvx wrapper.\n` +
-            `Command: ${cmd} ${args.join(" ")}\n` +
-            `Error: ${String(err)}\n\n` +
-            `Make sure 'uv' is installed and 'uvx' is on PATH.\n`
-        );
-        process.exit(1);
-    });
+  const child = spawn(uvx, args, {
+    stdio: ["pipe", "pipe", "pipe"],
+    env: process.env,
+  });
+
+  process.stdin.pipe(child.stdin);
+  child.stdout.pipe(process.stdout);
+  child.stderr.pipe(process.stderr);
+
+  child.on("exit", (code) => process.exit(code ?? 1));
+  child.on("error", (err) => {
+    process.stderr.write(
+      `Failed to start uvx.\nCommand: ${uvx} ${args.join(" ")}\nError: ${String(err)}\n`
+    );
+    process.exit(1);
+  });
 }
 
 run();
