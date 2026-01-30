@@ -1,7 +1,8 @@
 import sys
 import json
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
+import os
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
@@ -13,7 +14,7 @@ from src.generators.word_generator import generate_word
 from src.generators.template_generator import TemplateDocumentGenerator
 from src.tools.template_tools import TemplateTools, GenerateFromBase64TemplateReq
 
-OUTPUT_DIR = ROOT / "generated_documents"
+OUTPUT_DIR = Path(os.getenv("MCP_DOC_OUTPUT_PATH", str(ROOT / "generated_documents")))
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 tg = TemplateDocumentGenerator(output_dir=OUTPUT_DIR)

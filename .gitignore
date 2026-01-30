@@ -20,6 +20,9 @@ generated_documents/
 # Docker
 .dockerignore
 
+# Node Modules
+node_modules/
+
 # IDE
 .vscode/
 .idea/

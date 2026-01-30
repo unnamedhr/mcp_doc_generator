@@ -1,88 +1,29 @@
 #!/usr/bin/env node
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { z } from "zod";
-import { spawnSync } from "node:child_process";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import {spawn} from "node:child_process";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+function run() {
+    const cmd = process.env.MCP_UVX || "uvx";
+    const args = ["mcp-doc-generator"];
 
-const projectRoot = resolve(__dirname, "..");
-const bridgePath = resolve(projectRoot, "mcp_bridge.py");
+    const child = spawn(cmd, args, {
+        stdio: ["pipe", "pipe", "pipe"],
+        env: process.env,
+    });
 
-function callPython(toolName: string, payload: unknown) {
-  const python = process.env.PYTHON || "python";
+    process.stdin.pipe(child.stdin);
+    child.stdout.pipe(process.stdout);
+    child.stderr.pipe(process.stderr);
 
-  const res = spawnSync(python, [bridgePath, toolName], {
-    input: JSON.stringify(payload ?? {}),
-    encoding: "utf-8",
-    cwd: projectRoot,
-  });
-
-  if (res.status !== 0) {
-    const msg =
-      [res.stderr?.trim(), res.stdout?.trim()].filter(Boolean).join("\n") ||
-      "Document Generator tool failed";
-    throw new Error(msg);
-  }
-
-  const out = (res.stdout || "").trim();
-  if (!out) throw new Error("Empty response from Document Generator tool");
-
-  try {
-    return JSON.parse(out);
-  } catch {
-    throw new Error(`Python returned non-JSON output:\n${out}`);
-  }
+    child.on("exit", (code) => process.exit(code ?? 1));
+    child.on("error", (err) => {
+        process.stderr.write(
+            `Failed to start uvx wrapper.\n` +
+            `Command: ${cmd} ${args.join(" ")}\n` +
+            `Error: ${String(err)}\n\n` +
+            `Make sure 'uv' is installed and 'uvx' is on PATH.\n`
+        );
+        process.exit(1);
+    });
 }
 
-const server = new McpServer({
-  name: "mcp_doc_generator",
-  version: "0.1.0",
-});
-
-const ToolInputShape = { data: z.any() };
-
-server.tool(
-  "excel_generator",
-  "Generate an Excel (.xlsx)",
-  ToolInputShape,
-  async ({ data }) => {
-    const result = callPython("excel_generator", { data });
-    return { content: [{ type: "text", text: JSON.stringify(result) }] };
-  }
-);
-
-server.tool(
-  "pdf_generator",
-  "Generate a PDF",
-  ToolInputShape,
-  async ({ data }) => {
-    const result = callPython("pdf_generator", { data });
-    return { content: [{ type: "text", text: JSON.stringify(result) }] };
-  }
-);
-
-server.tool(
-  "word_generator",
-  "Generate a Word (.docx)",
-  ToolInputShape,
-  async ({ data }) => {
-    const result = callPython("word_generator", { data });
-    return { content: [{ type: "text", text: JSON.stringify(result) }] };
-  }
-);
-
-server.tool(
-  "template_generator",
-  "Generate a document from a template",
-  ToolInputShape,
-  async ({ data }) => {
-    const result = callPython("template_generator", { data });
-    return { content: [{ type: "text", text: JSON.stringify(result) }] };
-  }
-);
-
-await server.connect(new StdioServerTransport());
+run();

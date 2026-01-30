@@ -1,19 +1,16 @@
 {
-  "name": "mcp_doc_generator",
+  "name": "mcp-doc-generator",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "bin": {
-    "mcp_doc_generator": "dist/index.js"
+    "mcp-doc-generator": "dist/index.js"
   },
+  "files": ["dist", "README.md", "LICENSE"],
   "scripts": {
     "build": "tsc",
     "prepare": "npm run build"
   },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
-    "zod": "^3.23.0"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@types/node": "^22.0.0",
     "typescript": "^5.4.0"
