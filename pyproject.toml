@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.scripts]
-mcp-doc-generator = "mcp_doc_generator_server.server:main"
+mcp-doc-generator = "mcp_doc_generator.server:main"
 
 [build-system]
 requires = ["setuptools>=68"]
