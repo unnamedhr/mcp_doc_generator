@@ -3,16 +3,10 @@ import { spawn } from "node:child_process";
 
 function run() {
   const uvx = process.env.MCP_UVX || "uvx";
-  const from = process.env.MCP_DOC_GENERATOR_FROM;
+  const DEFAULT_FROM =
+    "git+https://github.com/unnamedhr/mcp_doc_generator.git@v0.1.0";
 
-  if (!from) {
-    process.stderr.write(
-      "Missing MCP_DOC_GENERATOR_FROM.\n" +
-        "Set it to your GitLab source, e.g.\n" +
-        "  git+https://oauth2:${GITLAB_TOKEN}@gitlab.scheer-group.com/fatima.zivkovic/mcp_doc_generator.git@v0.1.3\n"
-    );
-    process.exit(1);
-  }
+  const from = process.env.MCP_DOC_GENERATOR_FROM || DEFAULT_FROM;
 
   const args = ["--from", from, "mcp-doc-generator"];
 
@@ -28,7 +22,10 @@ function run() {
   child.on("exit", (code) => process.exit(code ?? 1));
   child.on("error", (err) => {
     process.stderr.write(
-      `Failed to start uvx.\nCommand: ${uvx} ${args.join(" ")}\nError: ${String(err)}\n`
+      `Failed to start uvx.\nCommand: ${uvx} ${args.join(" ")}\nError: ${String(
+        err
+      )}\n\n` +
+        `Make sure uv/uvx is installed and available on PATH.\n`
     );
     process.exit(1);
   });
